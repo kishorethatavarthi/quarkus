@@ -1,0 +1,100 @@
+Select * from QRTZ_FIRED_TRIGGERS;
+Select * from QRTZ_PAUSED_TRIGGER_GRPS;
+Select * from QRTZ_SCHEDULER_STATE;
+Select * from QRTZ_LOCKS;
+Select * from QRTZ_SIMPLE_TRIGGERS;
+Select * from QRTZ_CRON_TRIGGERS;
+Select * from QRTZ_SIMPROP_TRIGGERS;
+Select * from QRTZ_BLOB_TRIGGERS;
+Select * from QRTZ_TRIGGERS;
+Select * from QRTZ_JOB_DETAILS;
+Select * from QRTZ_CALENDARS;
+Select * from TASKS;
+
+---------------------------------------------
+Data base configuration:
+
+
+To use two separate databases in your Quarkus application, one for Quartz tasks and the other for other transactions, you'll need to configure two distinct datasources. Here's how you can achieve this:
+
+**1. Configure Datasources:**
+
+In your `application.properties` file, define two datasource configurations:
+
+```properties
+quarkus.datasource.primary.db-kind=mysql
+quarkus.datasource.primary.jdbc-url=jdbc:mysql://your-mysql-host:3306/your-mysql-database
+quarkus.datasource.primary.username=your-mysql-username
+quarkus.datasource.primary.password=your-mysql-password
+
+quarkus.datasource.secondary.db-kind=mariadb
+quarkus.datasource.secondary.jdbc-url=jdbc:mariadb://your-mariadb-host:3306/your-mariadb-database
+quarkus.datasource.secondary.username=your-mariadb-username
+quarkus.datasource.secondary.password=your-mariadb-password
+```
+
+**2. Specify Datasource for Quartz:**
+
+To use the MariaDB datasource for Quartz, set the `quarkus.quartz.datasource` property:
+
+```properties
+quarkus.quartz.datasource=secondary
+```
+
+**3. Configure Transactions:**
+
+If you need to use transactions that span multiple datasources, you'll need to configure a transaction manager and specify the datasource for each transaction. For example, using JTA:
+
+```properties
+quarkus.jta.enabled=true
+quarkus.jta.default-data-source=primary
+```
+
+**4. Use Datasources in Your Code:**
+
+To access the correct datasource in your code, you can use the `@PersistenceContext` annotation with the `unitName` attribute:
+
+```java
+@PersistenceContext(unitName = "primary")
+private EntityManager primaryEntityManager;
+
+@PersistenceContext(unitName = "secondary")
+private EntityManager secondaryEntityManager;
+```
+
+**Example:**
+
+```java
+@Path("/data")
+public class DataResource {
+
+    @PersistenceContext(unitName = "primary")
+    private EntityManager primaryEntityManager;
+
+    @PersistenceContext(unitName = "secondary")
+    private EntityManager secondaryEntityManager;
+
+    @POST
+    public void saveData(Data data) {
+        // Save data to the primary database
+        primaryEntityManager.persist(data);
+    }
+
+    @Transactional
+    public void saveDataWithTransaction(Data data) {
+        // Save data to both databases within a transaction
+        primaryEntityManager.persist(data);
+        secondaryEntityManager.persist(data);
+    }
+}
+```
+
+**Additional Considerations:**
+
+- Ensure that your database drivers are compatible with Quarkus.
+- Adjust the datasource configuration properties to match your specific database settings.
+- If you're using a different transaction manager, refer to its documentation for configuration instructions.
+- Consider using a JPA persistence unit for each datasource to manage entities and transactions more effectively.
+
+By following these steps, you can successfully configure and use two separate databases in your Quarkus application, differentiating between them for Quartz tasks and other transactions.
+
